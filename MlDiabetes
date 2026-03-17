@@ -1,0 +1,87 @@
+import pandas as pd
+from sklearn.model_selection import train_test_split
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.metrics import accuracy_score
+
+# 1. Ler o CSV e nomear as colunas
+
+colunas = ['year', 'gender', 'age', 'location', 'race:AfricanAmerican', 'race:Asian', 'race:Caucasian', 'race:Hispanic', 'race:Other', 'hypertension', 'heart_disease', 'smoking_history', 'bmi', 'hbA1c_level', 'blood_glucose_level', 'diabetes'] 
+dados = pd.read_csv('diabetes_datastudi.csv', names=colunas ,header=0)  # , header=0 se o CSV já tiver cabeçalho
+
+# 2. Selecionar 10% dos dados para amostragem
+amostra = dados.sample(frac=0.1, random_state=42)
+
+# 3. Separar entradas e saída
+entradas = amostra.drop('diabetes', axis=1)
+entradas = pd.get_dummies(entradas)  # Converte strings para colunas numéricas binárias
+saida = amostra['diabetes']
+
+
+# 4. Dividir amostra em treino e teste
+entradas_treino, entradas_teste, saida_treino, saida_teste = train_test_split(
+    entradas, saida, test_size=0.3, random_state=42
+)
+
+# 5. Treinar modelo Random Forest
+modelo = RandomForestClassifier(random_state=42)
+modelo.fit(entradas_treino, saida_treino)
+
+# 6. Avaliar acurácia
+previsoes = modelo.predict(entradas_teste)
+acuracia = accuracy_score(saida_teste, previsoes)
+print(f'Acurácia: {acuracia:.2%}')
+
+# 7. Se a acurácia for >= 70%, aplicar ao conjunto completo
+if acuracia >= 0.7:
+    # Aplicar pd.get_dummies ao conjunto completo (mesmo que foi feito no treino)
+    todas_entradas = dados.drop('diabetes', axis=1)
+    todas_entradas = pd.get_dummies(todas_entradas)  # Converte as variáveis categóricas em variáveis dummy
+
+    # Garantir que as colunas do conjunto completo sejam as mesmas que no conjunto de treino
+    todas_entradas = todas_entradas.reindex(columns=entradas.columns, fill_value=0)
+
+    # Fazer as previsões
+    todas_previsoes = modelo.predict(todas_entradas)
+    
+    # Adicionar as previsões ao DataFrame original
+    dados['previsao_diabetes'] = todas_previsoes
+    print("Previsões aplicadas ao conjunto completo:")
+    print(dados.head())
+else:
+    print("A acurácia foi menor que 70%. Modelo não aplicado ao conjunto completo.")
+
+
+---------------------------------------------------------------------------------
+
+parte dos graficos 
+
+
+import matplotlib.pyplot as plt
+import seaborn as sns
+
+# Usando a probabilidade de ser diabético para o gráfico
+# predict_proba retorna a probabilidade para ambas as classes (0 e 1), pegamos a probabilidade de ser diabetes (classe 1)
+probabilidades = modelo.predict_proba(todas_entradas)[:, 1]
+
+# Plotando
+plt.figure(figsize=(10, 6))
+
+# Criando o gráfico de dispersão
+plt.scatter( dados['bmi'],dados['age'], c=probabilidades, cmap='coolwarm', s=40, alpha=0.7)
+
+# Adicionando título e rótulos
+plt.title('Propensão de Diabetes por Idade e IMC')
+plt.ylabel('Idade')
+plt.xlabel('IMC (Índice de Massa Corporal)')
+
+# Adicionando barra de cores para indicar a probabilidade
+plt.colorbar(label='Probabilidade de Diabetes')
+
+# Mostrar o gráfico
+plt.show()
+
+
+
+
+
+-----------------------------
